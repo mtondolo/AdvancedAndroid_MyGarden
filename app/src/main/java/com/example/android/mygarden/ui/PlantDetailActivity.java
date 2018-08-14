@@ -1,20 +1,20 @@
 package com.example.android.mygarden.ui;
 
 /*
-* Copyright (C) 2017 The Android Open Source Project
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*  	http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -29,7 +29,6 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.example.android.mygarden.PlantWateringService;
 import com.example.android.mygarden.R;
 import com.example.android.mygarden.provider.PlantContract;
 import com.example.android.mygarden.utils.PlantUtils;
@@ -58,7 +57,22 @@ public class PlantDetailActivity extends AppCompatActivity
     }
 
     public void onWaterButtonClick(View view) {
-        PlantWateringService.startActionWaterPlant(this, mPlantId);
+        //check if already dead then can't water
+        Uri SINGLE_PLANT_URI = ContentUris.withAppendedId(
+                BASE_CONTENT_URI.buildUpon().appendPath(PATH_PLANTS).build(), mPlantId);
+        Cursor cursor = getContentResolver().query(SINGLE_PLANT_URI, null, null, null, null);
+        if (cursor == null || cursor.getCount() < 1) return; //can't find this plant!
+        cursor.moveToFirst();
+        long lastWatered = cursor.getLong(cursor.getColumnIndex(PlantContract.PlantEntry.COLUMN_LAST_WATERED_TIME));
+        long timeNow = System.currentTimeMillis();
+        if ((timeNow - lastWatered) > PlantUtils.MAX_AGE_WITHOUT_WATER)
+            return; // plant already dead
+
+        ContentValues contentValues = new ContentValues();
+        // Update the watered timestamp
+        contentValues.put(PlantContract.PlantEntry.COLUMN_LAST_WATERED_TIME, timeNow);
+        getContentResolver().update(SINGLE_PLANT_URI, contentValues, null, null);
+        cursor.close();
     }
 
     @Override
@@ -111,7 +125,6 @@ public class PlantDetailActivity extends AppCompatActivity
         Uri SINGLE_PLANT_URI = ContentUris.withAppendedId(
                 BASE_CONTENT_URI.buildUpon().appendPath(PATH_PLANTS).build(), mPlantId);
         getContentResolver().delete(SINGLE_PLANT_URI, null, null);
-        PlantWateringService.startActionUpdatePlantWidgets(this);
         finish();
     }
 }
